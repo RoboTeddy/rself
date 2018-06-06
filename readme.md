@@ -14,3 +14,5 @@ Parts list:
 * Resistor (roughly 1k ohm) (see diagram in `robosleep/sender/main.ino`)
 
 * [Piezoelectric buzzer](https://www.amazon.com/Adafruit-Accessories-Large-Enclosed-Element/dp/B01BMRDGBE/) (I used a different one; not sure where I bought it from)
+
+![picture of robosleep](https://www.dropbox.com/s/ent8byd5mc7uifi/robosleep.jpeg?raw=1)
