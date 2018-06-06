@@ -1,0 +1,22 @@
+{
+  "private": true,
+  "license": "UNLICENSED",
+  "dependencies": {
+    "moment": "2.22.0",
+    "moment-timezone": "0.5.14",
+    "mysql2": "1.5.3",
+    "request": "2.85.0",
+    "request-promise-native": "1.0.5"
+  },
+  "scripts": {
+    "console":
+      "open https://console.aws.amazon.com/lambda/home?region=us-east-1#/functions/robosleep-receive?tab=graph",
+    "package": "zip -r --exclude=dist/ dist/robosleep-receiver.zip .",
+    "upload":
+      "aws --profile=personal lambda update-function-code --publish --function-name \"robosleep-receive\" --zip-file fileb://dist/robosleep-receiver.zip",
+    "deploy": "yarn package && yarn upload"
+  },
+  "devDependencies": {
+    "prettier": "1.11.1"
+  }
+}
