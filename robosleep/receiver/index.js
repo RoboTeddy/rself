@@ -34,48 +34,91 @@ const createMysqlConnection = () =>
         }.bind(this)
       )
     },
+    typeCast: function (field, next) {
+      if (field.type === 'DECIMAL' || field.type === 'NEWDECIMAL') {
+        const value = field.string()
+        return (value === null) ? null : Number(value);
+      }
+      return next()
+    }
   })
+
+
+const handlers = {
+  setBedtime: async ({bedtimeHrsAfterMidnight}, context) => {
+    const db = await createMysqlConnection()
+    await db.query(
+      `INSERT INTO bedtimes (bedtimeHrsAfterMidnight, createdMts)
+      VALUES (:bedtimeHrsAfterMidnight, :createdMts)`,
+      {bedtimeHrsAfterMidnight, createdMts: Date.now()}
+    )
+    await db.end()
+    context.done(null, {statusCode: 200, headers: {}, body: ''})
+  },
+
+  getBedtime: async (params, context) => {
+    const db = await createMysqlConnection()
+    const [[{bedtimeHrsAfterMidnight}]] = await db.query(
+      'SELECT * from bedtimes ORDER BY id DESC LIMIT 1'
+    )
+    await db.end()
+    context.done(null, {
+      statusCode: 200,
+      headers: {},
+      body: JSON.stringify(bedtimeHrsAfterMidnight)
+    })
+  },
+
+  R: async (params, context) => {
+    const resistance = Number.parseFloat(params.data)
+    const resistanceThreshold = 1280 // ohms
+    const isInBed = resistance > resistanceThreshold
+    const mts = Date.now()
+
+    const db = await createMysqlConnection()
+    const [[{bedtimeHrsAfterMidnight}]] = await db.query(
+      'SELECT * from bedtimes ORDER BY id DESC LIMIT 1'
+    )
+
+    console.log('bedtimeHrsAfterMidnight', bedtimeHrsAfterMidnight)
+
+    const bedTimeMts = moment
+      .tz(mts, TZ)
+      .startOf('day')
+      .add(bedtimeHrsAfterMidnight, 'hours')
+    const afterBedTimeMts = Date.now() - bedTimeMts
+
+    /*
+    Note: there's technically a race condition here
+
+    The sender calls us every 60 seconds; it might be that one request
+    occurs just before the violation period and another occurs just after.
+
+    Wrote it this way because it was easy and so the receiver can stay stateless;
+    logging is just for logging.
+    */
+    const isViolation =
+      afterBedTimeMts > 0 && afterBedTimeMts <= 60 * 1000 && !isInBed
+
+    console.log('isViolation?', isViolation)
+
+    await db.query(
+      `INSERT INTO bedLog (resistance, isInBed, isViolation, createdMts)
+      VALUES (:resistance, :isInBed, :isViolation, :createdMts)`,
+      {resistance, isInBed: isInBed ? 1 : 0, isViolation, createdMts: mts}
+    )
+
+    await db.end()
+
+    if (isViolation) await buzz(3000)
+
+    console.log('done!')
+    context.done(null, {statusCode: 200, headers: {}, body: ''})
+  }
+}
+
 
 exports.handler = async (event, context) => {
   const params = JSON.parse(event.body)
-  const resistance = Number.parseFloat(params.data)
-  const resistanceThreshold = 1300 // ohms
-  const isInBed = resistance > resistanceThreshold
-  const mts = Date.now()
-
-  const bedTimeMts = moment
-    .tz(mts, TZ)
-    .startOf('day')
-    .add(1, 'hours')
-  const afterBedTimeMts = Date.now() - bedTimeMts
-
-  /*
-  Note: there's technically a race condition here
-
-  The sender calls us every 60 seconds; it might be that one request
-  occurs just before the violation period and another occurs just after.
-
-  Wrote it this way because it was easy and so the receiver can stay stateless;
-  logging is just for logging.
-  */
-  const isViolation =
-    afterBedTimeMts > 0 && afterBedTimeMs <= 60 * 1000 && !isInBed
-
-  const db = await createMysqlConnection()
-
-  await db.query(
-    `INSERT INTO bedLog (resistance, isInBed, isViolation, createdMts)
-    VALUES (:resistance, :isInBed, :isViolation, :createdMts)`,
-    {resistance, isInBed: isInBed ? 1 : 0, isViolation, createdMts: mts}
-  )
-
-  await db.end()
-
-  if (isViolation) await buzz(3000)
-
-  context.done(null, {
-    statusCode: 200,
-    headers: {},
-    body: '',
-  })
+  await handlers[params.event](params, context)
 }
