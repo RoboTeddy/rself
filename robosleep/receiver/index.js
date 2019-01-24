@@ -1,6 +1,7 @@
 const request = require('request-promise-native')
 const moment = require('moment-timezone')
 const mysql = require('mysql2/promise')
+const twilio = require("twilio");
 
 const TZ = 'America/Los_Angeles'
 
@@ -12,6 +13,19 @@ const buzz = async ms => {
       args: ms.toString(),
       access_token: process.env.PARTICLE_ACCESS_TOKEN,
     },
+  })
+}
+
+
+const txt = async (msg) => {
+  const client = twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_ACCESS_TOKEN
+  )
+  await client.messages.create({
+    from: process.env.TWILIO_FROM_PHONE,
+    to: process.env.PHONE_TO_SEND_REMINDERS_TO,
+    body: msg,
   })
 }
 
@@ -97,11 +111,16 @@ const handlers = {
     Wrote it this way because it was easy and so the receiver can stay stateless;
     logging is just for logging.
     */
-    const isViolation =
-      afterBedTimeMts > 0 && afterBedTimeMts <= 60 * 1000 && !isInBed
+    const minutesToBedTime = Math.ceil((Date.now() - bedTimeMts) / (60 * 1000))
 
+    // reminders
+    if ((minutesToBedTime === 15 || minutesToBedTime === 5) && !isInBed) {
+      console.log('Sending reminder')
+      await txt(`Read in ${minutesToBedTime} min`)
+    }
+
+    const isViolation = minutesToBedTime === -1 && !isInBed
     console.log('isViolation?', isViolation)
-
     await db.query(
       `INSERT INTO bedLog (resistance, isInBed, isViolation, createdMts)
       VALUES (:resistance, :isInBed, :isViolation, :createdMts)`,

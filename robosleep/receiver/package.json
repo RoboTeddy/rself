@@ -6,7 +6,8 @@
     "moment-timezone": "0.5.14",
     "mysql2": "1.5.3",
     "request": "2.85.0",
-    "request-promise-native": "1.0.5"
+    "request-promise-native": "1.0.5",
+    "twilio": "3.27.1"
   },
   "scripts": {
     "console":
